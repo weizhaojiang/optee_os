@@ -11,6 +11,7 @@
 #include <string.h>
 #include <string_ext.h>
 #include <malloc.h>
+#include <kernel/tee_time.h>
 
 #define TA_NAME		"stats.ta"
 
@@ -37,6 +38,7 @@
  * uint32_t    Biggest byte size which allocation succeeded
  */
 #define STATS_CMD_TA_STATS		3
+#define STATS_CMD_SECTIME_STATS		4
 
 #define STATS_NB_POOLS			4
 
@@ -175,6 +177,29 @@ static TEE_Result get_user_ta_stats(uint32_t type,
 	return res;
 }
 
+static TEE_Result get_securetime_stats(uint32_t type,
+				    TEE_Param p[TEE_NUM_PARAMS])
+{
+	TEE_Time tee_time;
+	TEE_Time ree_time;
+
+	if (TEE_PARAM_TYPES(TEE_PARAM_TYPE_VALUE_OUTPUT,
+			    TEE_PARAM_TYPE_VALUE_OUTPUT,
+			    TEE_PARAM_TYPE_NONE,
+			    TEE_PARAM_TYPE_NONE) != type)
+		return TEE_ERROR_BAD_PARAMETERS;
+
+	tee_time_get_sys_time(&tee_time);
+	tee_time_get_ree_time(&ree_time);
+
+	p[0].value.a = ree_time.seconds;
+	p[0].value.b = ree_time.millis;
+	p[1].value.a = tee_time.seconds;
+	p[1].value.b = tee_time.millis;
+
+	return TEE_SUCCESS;
+}
+
 /*
  * Trusted Application Entry Points
  */
@@ -192,6 +217,8 @@ static TEE_Result invoke_command(void *psess __unused,
 		return get_memleak_stats(ptypes, params);
 	case STATS_CMD_TA_STATS:
 		return get_user_ta_stats(ptypes, params);
+	case STATS_CMD_SECTIME_STATS:
+		return get_securetime_stats(ptypes, params);
 	default:
 		break;
 	}
